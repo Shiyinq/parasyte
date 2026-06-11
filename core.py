@@ -103,14 +103,16 @@ def build_polyglot(
     key = derive_key(password, salt)
     
     cipher = AES.new(key, AES.MODE_GCM, nonce=get_random_bytes(NONCE_SIZE))
-    ciphertext, tag = cipher.encrypt_and_digest(original_data)
-    
-    signature = hashlib.sha256(key + b"PARASYTE_SIG").digest()[:8]
     
     filename_bytes = original_filename.encode("utf-8")
     filename_length = struct.pack(">H", len(filename_bytes))
+    data_to_encrypt = filename_length + filename_bytes + original_data
     
-    payload = signature + filename_length + filename_bytes + cipher.nonce + tag + ciphertext + salt
+    ciphertext, tag = cipher.encrypt_and_digest(data_to_encrypt)
+    
+    signature = hashlib.sha256(key + b"PARASYTE_SIG").digest()[:8]
+    
+    payload = signature + cipher.nonce + tag + ciphertext + salt
 
     if carrier_type == "jpeg":
         jpeg_end = find_jpeg_end(carrier_data)
@@ -138,12 +140,6 @@ def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
     hidden = polyglot_data[magic_pos:]
     offset = 8  # Skip signature
 
-    filename_length = struct.unpack(">H", hidden[offset : offset + 2])[0]
-    offset += 2
-
-    original_filename = hidden[offset : offset + filename_length].decode("utf-8")
-    offset += filename_length
-
     nonce = hidden[offset : offset + NONCE_SIZE]
     offset += NONCE_SIZE
 
@@ -153,7 +149,11 @@ def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
     ciphertext = hidden[offset : -SALT_SIZE]
 
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-    decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+    decrypted_blob = cipher.decrypt_and_verify(ciphertext, tag)
+    
+    filename_length = struct.unpack(">H", decrypted_blob[:2])[0]
+    original_filename = decrypted_blob[2 : 2 + filename_length].decode("utf-8")
+    decrypted_data = decrypted_blob[2 + filename_length :]
 
     return original_filename, decrypted_data
 
