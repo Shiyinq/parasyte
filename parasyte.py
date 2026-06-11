@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import os
 import sys
+import subprocess
 
 from version import __version__ as VERSION
 from core import (
@@ -253,6 +254,54 @@ def cmd_cure(args):
     console.print(f"Cured output at: {os.path.abspath(hive_dir)}")
 
 
+def cmd_update(args):
+    if not RICH_AVAILABLE:
+        print("Checking for updates on GitHub...")
+    else:
+        console.print("[yellow]Checking for updates on GitHub...[/yellow]")
+        
+    try:
+        # Use curl to get the latest tag from the redirect Location header
+        cmd_latest = "curl -sI https://github.com/Shiyinq/parasyte/releases/latest | grep -i '^location:' | sed -E 's/.*\\/tag\\/([^[:space:]\\r]*).*/\\1/'"
+        result = subprocess.run(cmd_latest, shell=True, capture_output=True, text=True)
+        latest_tag = result.stdout.strip()
+        
+        if not latest_tag:
+            msg = "Error: Could not determine the latest version from GitHub."
+            if RICH_AVAILABLE:
+                console.print(f"[red]{msg}[/red]")
+            else:
+                print(msg)
+            sys.exit(1)
+            
+        if latest_tag == VERSION:
+            msg = f"You are already using the latest version ({VERSION})."
+            if RICH_AVAILABLE:
+                console.print(f"[green]{msg}[/green]")
+            else:
+                print(msg)
+            sys.exit(0)
+        else:
+            if RICH_AVAILABLE:
+                console.print(f"[green]Update found![/green] {VERSION} -> {latest_tag}")
+                console.print("Running automated install script (this may require sudo password)...")
+            else:
+                print(f"Update found! {VERSION} -> {latest_tag}")
+                print("Running automated install script (this may require sudo password)...")
+            
+            # Execute the bash script
+            install_cmd = "curl -fsSL https://raw.githubusercontent.com/Shiyinq/parasyte/main/install.sh | bash"
+            subprocess.run(install_cmd, shell=True)
+            
+    except Exception as e:
+        msg = f"Failed to check for updates: {e}"
+        if RICH_AVAILABLE:
+            console.print(f"[red]{msg}[/red]")
+        else:
+            print(msg)
+        sys.exit(1)
+
+
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -287,6 +336,8 @@ Examples:
     cure_parser.add_argument("--input", required=True, help="Infected file or folder")
     cure_parser.add_argument("--hive", default=None, help="Output folder (default: <input_path>/cured/)")
 
+    update_parser = subparsers.add_parser("update", help="Update Parasyte to the latest version directly from GitHub")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -310,6 +361,8 @@ Examples:
         cmd_infect(args)
     elif args.command == "cure":
         cmd_cure(args)
+    elif args.command == "update":
+        cmd_update(args)
 
 
 if __name__ == "__main__":
