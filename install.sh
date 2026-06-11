@@ -41,8 +41,8 @@ fi
 
 echo "=> Detecting latest release for $OS..."
 
-# Fetch the latest release version from GitHub API
-LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+# Fetch the latest release version without hitting GitHub API rate limits
+LATEST_TAG=$(curl -sI "https://github.com/$REPO/releases/latest" | grep -i '^location:' | sed -E 's/.*\/tag\/([^[:space:]\r]*).*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
     echo "❌ Error: Could not fetch the latest release from GitHub."
