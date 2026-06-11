@@ -6,6 +6,18 @@ Parasyte uses **AES-256-GCM encryption** combined with the **polyglot file techn
 
 ---
 
+## 🚀 One-Line Install (macOS & Linux)
+
+The easiest and fastest way to install Parasyte globally on your system is via our automated installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Shiyinq/parasyte/main/install.sh | bash
+```
+
+*(This script automatically fetches the latest pre-compiled C-binary from GitHub Releases and sets it up instantly.)*
+
+---
+
 ## Table of Contents
 
 - [Terminology](#terminology)
@@ -160,18 +172,18 @@ pip install pycryptodome
 
 **That's it.** Only one external dependency (`pycryptodome`).
 
-### Standalone Binary Installation (Optional)
+### Build from Source (Nuitka Compilation)
 
-If you want to compile Parasyte into a single standalone executable (so you can run it anywhere natively without Python), you can use the provided Makefile:
+If you want to compile Parasyte into a native C-binary yourself (so you can run it anywhere natively without Python), you can use the provided Makefile which uses Nuitka:
 
 ```bash
 make install
 make build
 ```
 
-This will generate a standalone binary at `dist/parasyte`. You can then install it globally to your system:
+This will compile the Python code and generate a `dist/parasyte.dist` folder. You can then install it globally to your system:
 ```bash
-sudo mv ./dist/parasyte /usr/local/bin/
+make install-parasyte
 ```
 
 ---
