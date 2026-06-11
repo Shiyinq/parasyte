@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     permissions:
       contents: write 
@@ -35,26 +35,12 @@ jobs:
         run: |
           python -m nuitka --standalone --assume-yes-for-downloads --output-dir=dist parasyte.py
 
-      - name: Archive Build (Mac & Linux)
-        if: matrix.os != 'windows-latest'
+      - name: Archive Build
         run: |
           cd dist
           tar -czvf parasyte-${{ matrix.os }}.tar.gz parasyte.dist/
 
-      - name: Archive Build (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd dist
-          Compress-Archive -Path parasyte.dist -DestinationPath parasyte-${{ matrix.os }}.zip
-
-      - name: Upload to GitHub Releases (Mac & Linux)
-        if: matrix.os != 'windows-latest'
+      - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           files: dist/parasyte-${{ matrix.os }}.tar.gz
-
-      - name: Upload to GitHub Releases (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/parasyte-${{ matrix.os }}.zip
