@@ -24,3 +24,4 @@ build: clean install
 
 clean:
 	rm -rf build/ dist/ __pycache__/
+	@echo "🧹 Clean successfully!"
