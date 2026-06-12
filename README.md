@@ -45,7 +45,7 @@ To embrace the biological Sci-Fi theme, this CLI uses specialized terms instead 
 | **`cure`** | **Decrypt** | The command to extract and decrypt your data back from an infected file. |
 | **`--dna`** | **Payload / Data** | Your secret files (the "genetic code" of the parasite) that you want to hide. |
 | **`--sel`** | **Sel** | The innocent-looking media file (image, video, audio) that will act as the disguise. |
-| **`--inang`** | **Input Host** | The infected file or folder (Host) you want to cure. |
+| **`--host`** | **Input Host** | The infected file or folder (Host) you want to cure. |
 | **`--hive`** | **Output Directory** | The folder where the resulting infected (or cured) files will be saved. |
 | **`--chromosome`** | **Zip Compression** | Condenses your DNA folder into a single tight package (ZIP) before infecting. |
 | **`--helicase`** | **Zip Extraction** | Unwinds and automatically extracts the chromosome payload (ZIP) during the cure process. |
@@ -179,7 +179,7 @@ python parasyte.py infect --dna dna/example.png
 open hive/example.png   # Opens in Preview
 
 # 4. Cure it back
-python parasyte.py cure --inang hive/example.png
+python parasyte.py cure --host hive/example.png
 # → Enter password
 # → Output: hive/cured/example.png  (identical to the original)
 ```
@@ -209,13 +209,13 @@ python parasyte.py infect --dna <file_or_folder> [--sel <sel_path>] [--hive <out
 ### Cure (Decrypt)
 
 ```bash
-python parasyte.py cure --inang <file_or_folder> [--hive <output_path>]
+python parasyte.py cure --host <file_or_folder> [--hive <output_path>]
 ```
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--inang` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files inside are cured recursively. |
-| `--hive` | ❌ | `<inang>/cured/` | Output folder for cured files. Files are restored with their original DNA filenames. |
+| `--host` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files inside are cured recursively. |
+| `--hive` | ❌ | `<host>/cured/` | Output folder for cured files. Files are restored with their original DNA filenames. |
 
 ---
 
@@ -245,7 +245,7 @@ Processing... ━━━━━━━━━━━━━━━━━━━━━━
 
 Done: 1/1 file(s) infected successfully
 Output directory: /path/to/hive
-To cure: python parasyte.py cure --inang hive
+To cure: python parasyte.py cure --host hive
 ```
 
 ### Infect an entire folder
@@ -279,7 +279,7 @@ Processing... ━━━━━━━━━━━━━━━━━━━━━━
 
 Done: 5/5 file(s) infected successfully
 Output directory: /Volumes/USB/hive/
-To cure: python parasyte.py cure --inang /Volumes/USB/hive/
+To cure: python parasyte.py cure --host /Volumes/USB/hive/
 ```
 
 ### Zip & Unzip Automatically (Chromosome & Helicase)
@@ -299,13 +299,13 @@ To extract it smoothly, add the `--helicase` flag during the cure process (actin
 
 ```bash
 # Cures the file and automatically unwinds the chromosome payload
-python parasyte.py cure --inang /Volumes/USB/hive/ --helicase
+python parasyte.py cure --host /Volumes/USB/hive/ --helicase
 ```
 
 ### Cure an entire hive
 
 ```bash
-python parasyte.py cure --inang /Volumes/USB/hive/
+python parasyte.py cure --host /Volumes/USB/hive/
 ```
 
 Output:
