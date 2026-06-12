@@ -44,8 +44,11 @@ To embrace the biological Sci-Fi theme, this CLI uses specialized terms instead 
 | **`infect`** | **Encrypt** | The command to encrypt your secret data and inject it into a media file. |
 | **`cure`** | **Decrypt** | The command to extract and decrypt your data back from an infected file. |
 | **`--dna`** | **Payload / Data** | Your secret files (the "genetic code" of the parasite) that you want to hide. |
-| **`--carrier`** | **Carrier / Host** | The innocent-looking media file (image, video, audio) that will act as the host. |
+| **`--sel`** | **Sel** | The innocent-looking media file (image, video, audio) that will act as the disguise. |
+| **`--inang`** | **Input Host** | The infected file or folder (Host) you want to cure. |
 | **`--hive`** | **Output Directory** | The folder where the resulting infected (or cured) files will be saved. |
+| **`--chromosome`** | **Zip Compression** | Condenses your DNA folder into a single tight package (ZIP) before infecting. |
+| **`--helicase`** | **Zip Extraction** | Unwinds and automatically extracts the chromosome payload (ZIP) during the cure process. |
 | **`--shred`** | **Secure Delete** | Permanently and securely wipes the original DNA file from your hard drive after a successful infection. |
 
 ---
@@ -70,7 +73,7 @@ Parasyte appends encrypted data **after** these boundaries. The result is a file
 flowchart TD
     Secret["Your Secret<br>(any file)"] --> ReadBin["Read as binary"]
     Pass["Password"] --> PBKDF2["PBKDF2 (600K iterations)<br>+ random salt"]
-    Carrier["Carrier File<br>(JPEG/PNG/MP4/MKV/MP3/WAV)"] --> FindBoundary["Find media boundary<br>(JPEG/PNG: after end tag)<br>(Audio/Video: end of file)"]
+    Sel["Sel File<br>(JPEG/PNG/MP4/MKV/MP3/WAV)"] --> FindBoundary["Find media boundary<br>(JPEG/PNG: after end tag)<br>(Audio/Video: end of file)"]
 
     PBKDF2 --> AESKey["256-bit AES key"]
     
@@ -79,7 +82,7 @@ flowchart TD
     
     Encrypt --> Payload["Build Payload:<br>Key-Derived Signature (8B)<br>+ filename + nonce + tag<br>+ ciphertext + salt"]
     
-    Payload --> Merge["Carrier media data + Encrypted payload<br>(looks normal, invisible to viewers)"]
+    Payload --> Merge["Sel media data + Encrypted payload<br>(looks normal, invisible to viewers)"]
     FindBoundary --> Merge
     
     Merge --> Output["Output polyglot file<br>(opens normally as image/video)"]
@@ -164,19 +167,19 @@ make install-parasyte
 ## Quick Start
 
 ```bash
-# 1. Put carrier files (JPEG/PNG/MP4/MKV/MP3/WAV) in the carriers/ folder
+# 1. Put sel files (JPEG/PNG/MP4/MKV/MP3/WAV) in the sel/ folder
 #    These are the "disguise" files — your secret will be hidden inside them.
 
-# 2. Infect a carrier
+# 2. Infect a sel
 python parasyte.py infect --dna dna/example.png
 # → Enter password (hidden input)
-# → Output: hive/example.png  (assuming the carrier assigned was example.png)
+# → Output: hive/example.png  (assuming the sel assigned was example.png)
 
 # 3. The output file looks like a normal image/video!
 open hive/example.png   # Opens in Preview
 
 # 4. Cure it back
-python parasyte.py cure --input hive/example.png
+python parasyte.py cure --inang hive/example.png
 # → Enter password
 # → Output: hive/cured/example.png  (identical to the original)
 ```
@@ -188,31 +191,31 @@ python parasyte.py cure --input hive/example.png
 ### Infect (Encrypt)
 
 ```bash
-python parasyte.py infect --dna <file_or_folder> [--carrier <carrier_path>] [--hive <output_path>] [--shred]
+python parasyte.py infect --dna <file_or_folder> [--sel <sel_path>] [--hive <output_path>] [--shred]
 ```
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
 | `--dna` | ✅ | — | DNA Payload (file or folder to hide). If folder, all files inside are infected recursively. |
-| `--carrier` | ❌ | `carriers/` | Path to carrier files. A random carrier is assigned to each DNA file. |
+| `--sel` | ❌ | `sel/` | Path to sel files. A random sel is assigned to each DNA file. |
 | `--hive` | ❌ | `hive/` | Output folder for infected polyglot files. |
 | `--shred` | ❌ | `False` | Securely destroy the original DNA file with random bytes after successful infection. |
 
-**Carrier assignment rules:**
-- Each DNA file is randomly assigned a carrier (never sequential).
-- If there are more carriers than DNA files, each DNA file gets a unique carrier.
-- If there are fewer carriers than DNA files, some carriers are reused.
+**Sel assignment rules:**
+- Each DNA file is randomly assigned a sel (never sequential).
+- If there are more sel_files than DNA files, each DNA file gets a unique sel.
+- If there are fewer sel_files than DNA files, some sel_files are reused.
 
 ### Cure (Decrypt)
 
 ```bash
-python parasyte.py cure --input <file_or_folder> [--hive <output_path>]
+python parasyte.py cure --inang <file_or_folder> [--hive <output_path>]
 ```
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--input` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files inside are cured recursively. |
-| `--hive` | ❌ | `<input>/cured/` | Output folder for cured files. Files are restored with their original DNA filenames. |
+| `--inang` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files inside are cured recursively. |
+| `--hive` | ❌ | `<inang>/cured/` | Output folder for cured files. Files are restored with their original DNA filenames. |
 
 ---
 
@@ -229,7 +232,7 @@ Output:
   Infection Plan
 
   DNA Payload   1 file(s) from 'dna/example.png'
-  Carriers      3 file(s) from 'carriers/'
+  Sels      3 file(s) from 'sel/'
   Hive Output   hive
   Encryption    AES-256-GCM (PBKDF2 600,000 iterations)
 
@@ -242,7 +245,7 @@ Processing... ━━━━━━━━━━━━━━━━━━━━━━
 
 Done: 1/1 file(s) infected successfully
 Output directory: /path/to/hive
-To cure: python parasyte.py cure --input hive
+To cure: python parasyte.py cure --inang hive
 ```
 
 ### Infect an entire folder
@@ -250,7 +253,7 @@ To cure: python parasyte.py cure --input hive
 ```bash
 python parasyte.py infect \
   --dna ./secret_documents/ \
-  --carrier /Volumes/USB/carriers/ \
+  --sel /Volumes/USB/sel/ \
   --hive /Volumes/USB/hive/
 ```
 
@@ -259,7 +262,7 @@ Output:
   Infection Plan
 
   DNA Payload   5 file(s) from './secret_documents/'
-  Carriers      3 file(s) from '/Volumes/USB/carriers/'
+  Sels      3 file(s) from '/Volumes/USB/sel/'
   Hive Output   /Volumes/USB/hive/
   Encryption    AES-256-GCM (PBKDF2 600,000 iterations)
 
@@ -276,33 +279,33 @@ Processing... ━━━━━━━━━━━━━━━━━━━━━━
 
 Done: 5/5 file(s) infected successfully
 Output directory: /Volumes/USB/hive/
-To cure: python parasyte.py cure --input /Volumes/USB/hive/
+To cure: python parasyte.py cure --inang /Volumes/USB/hive/
 ```
 
-### Zip & Unzip Automatically
+### Zip & Unzip Automatically (Chromosome & Helicase)
 
-If you have a large folder with many files and you don't want to infect them individually into dozens of carriers, you can use the `--zip` flag. Parasyte will automatically compress your target folder into a single `.zip` file, encrypt it, and embed it into a single carrier.
+If you have a large folder with many files and you don't want to infect them individually into dozens of sel_files, you can use the `--chromosome` flag (acting like DNA supercoiling). Parasyte will automatically condense your target folder into a single `.zip` file, encrypt it, and embed it into a single sel.
 
 ```bash
-# Zips the folder, encrypts it, and infects a single carrier
+# Zips the folder, encrypts it, and infects a single sel
 python parasyte.py infect \
   --dna ./secret_documents/ \
-  --carrier /Volumes/USB/carriers/ \
+  --sel /Volumes/USB/sel/ \
   --hive /Volumes/USB/hive/ \
-  --zip
+  --chromosome
 ```
 
-To extract it smoothly, add the `--unzip` flag during the cure process. Parasyte will decrypt the payload and, if it detects a valid ZIP file, it will automatically extract its contents and delete the raw ZIP file.
+To extract it smoothly, add the `--helicase` flag during the cure process (acting like DNA unwinding). Parasyte will decrypt the payload and, if it detects a valid condensed chromosome (ZIP), it will automatically extract its contents and delete the raw ZIP file.
 
 ```bash
-# Cures the file and automatically unzips the payload
-python parasyte.py cure --input /Volumes/USB/hive/ --unzip
+# Cures the file and automatically unwinds the chromosome payload
+python parasyte.py cure --inang /Volumes/USB/hive/ --helicase
 ```
 
 ### Cure an entire hive
 
 ```bash
-python parasyte.py cure --input /Volumes/USB/hive/
+python parasyte.py cure --inang /Volumes/USB/hive/
 ```
 
 Output:
@@ -336,17 +339,17 @@ python parasyte.py cure --input hive/ --hive ~/Desktop/cured_data/
 
 ```
 parasyte/
+├── .github/             # GitHub Actions workflows
+├── .gitignore           # Ignored files configuration
+├── core.py              # Cryptography and polyglot core engine
+├── install.sh           # Global installation script
+├── Makefile             # Build automation
 ├── parasyte.py          # Main CLI application
-├── test_verify.py       # Automated verification tests
 ├── README.md            # This file
-├── carriers/            # Carrier files (your "disguise" media)
-│   ├── example.png      # Any image (JPEG, PNG)
-│   ├── video.mp4        # Any video (MP4, MKV)
-│   └── audio.mp3        # Any audio (MP3, WAV)
-├── dna/                 # Files to encrypt (your secrets)
-│   └── example.png
-└── hive/                # Encrypted output (polyglot files)
-    └── example.png
+├── requirements.txt     # Python dependencies
+├── test_verify.py       # Automated verification tests
+├── update_version.py    # Script to bump version
+└── version.py           # Version tracking
 ```
 
 ---
@@ -399,9 +402,9 @@ Most social media platforms **re-encode** uploaded images and videos. This proce
 
 ### File Size
 
-The output file size = carrier size + encrypted data size + small overhead (~50 bytes).
+The output file size = sel size + encrypted data size + small overhead (~50 bytes).
 
-If your secret file is much larger than the carrier, the output file will be noticeably larger. For example, a 200 KB JPEG carrier containing a 500 MB video will produce a ~500 MB "image" — which may look suspicious.
+If your secret file is much larger than the sel, the output file will be noticeably larger. For example, a 200 KB JPEG sel containing a 500 MB video will produce a ~500 MB "image" — which may look suspicious.
 
 ### Memory Usage
 
@@ -417,8 +420,8 @@ python test_verify.py
 ```
 
 The test suite verifies:
-1. **Carrier assignment logic** — unique assignment, reuse, and randomness
-2. **Encrypt/decrypt roundtrip** — every data file × every carrier format
+1. **Sel assignment logic** — unique assignment, reuse, and randomness
+2. **Encrypt/decrypt roundtrip** — every data file × every sel format
 3. **Data integrity** — byte-for-byte comparison via SHA-256
 4. **Wrong password rejection** — ensures wrong passwords are detected
 5. **File format validity** — output files have correct media headers
