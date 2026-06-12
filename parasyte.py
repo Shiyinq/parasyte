@@ -332,6 +332,14 @@ def cmd_update(args):
             install_cmd = "curl -fsSL https://raw.githubusercontent.com/Shiyinq/parasyte/main/install.sh | bash"
             subprocess.run(install_cmd, shell=True)
             
+            release_url = f"https://github.com/Shiyinq/parasyte/releases/tag/{latest_tag}"
+            if RICH_AVAILABLE:
+                console.print(f"\n[bold cyan]✨ Update complete![/bold cyan]")
+                console.print(f"View what's new in {latest_tag}: [link={release_url}]{release_url}[/link]")
+            else:
+                print(f"\n✨ Update complete!")
+                print(f"View what's new in {latest_tag}: {release_url}")
+            
     except Exception as e:
         msg = f"Failed to check for updates: {e}"
         if RICH_AVAILABLE:
