@@ -279,6 +279,26 @@ Output directory: /Volumes/USB/hive/
 To cure: python parasyte.py cure --input /Volumes/USB/hive/
 ```
 
+### Zip & Unzip Automatically
+
+If you have a large folder with many files and you don't want to infect them individually into dozens of carriers, you can use the `--zip` flag. Parasyte will automatically compress your target folder into a single `.zip` file, encrypt it, and embed it into a single carrier.
+
+```bash
+# Zips the folder, encrypts it, and infects a single carrier
+python parasyte.py infect \
+  --dna ./secret_documents/ \
+  --carrier /Volumes/USB/carriers/ \
+  --hive /Volumes/USB/hive/ \
+  --zip
+```
+
+To extract it smoothly, add the `--unzip` flag during the cure process. Parasyte will decrypt the payload and, if it detects a valid ZIP file, it will automatically extract its contents and delete the raw ZIP file.
+
+```bash
+# Cures the file and automatically unzips the payload
+python parasyte.py cure --input /Volumes/USB/hive/ --unzip
+```
+
 ### Cure an entire hive
 
 ```bash
