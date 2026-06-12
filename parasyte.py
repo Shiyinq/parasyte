@@ -10,6 +10,8 @@ import hashlib
 import os
 import sys
 import subprocess
+import shutil
+import zipfile
 
 from version import __version__ as VERSION
 from core import (
@@ -97,6 +99,7 @@ def cure_single(
     polyglot_path: str,
     hive_dir: str,
     password: str,
+    unzip: bool = False,
 ) -> tuple[bool, str]:
     """Extract and decrypt (cure) a single polyglot file."""
     try:
@@ -113,9 +116,9 @@ def cure_single(
             raise e
 
         output_path = os.path.join(hive_dir, original_filename)
+        name, ext = os.path.splitext(original_filename)
 
         if os.path.exists(output_path):
-            name, ext = os.path.splitext(original_filename)
             counter = 1
             while os.path.exists(output_path):
                 output_path = os.path.join(hive_dir, f"{name}_{counter}{ext}")
@@ -125,8 +128,17 @@ def cure_single(
         with open(output_path, "wb") as f:
             f.write(decrypted_data)
 
+        msg_suffix = ""
+        if unzip and zipfile.is_zipfile(output_path):
+            extract_dir = os.path.join(hive_dir, name)
+            os.makedirs(extract_dir, exist_ok=True)
+            with zipfile.ZipFile(output_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            os.remove(output_path)
+            msg_suffix = f" (unzipped to '{name}/')"
+
         short_hash = hashlib.sha256(decrypted_data).hexdigest()[:6]
-        msg = f"{polyglot_name} -> {original_filename} (sha256:{short_hash})"
+        msg = f"{polyglot_name} -> {original_filename} (sha256:{short_hash}){msg_suffix}"
         return True, msg
 
     except (ValueError, KeyError):
@@ -136,11 +148,35 @@ def cure_single(
 
 
 def cmd_infect(args):
+    tmp_dir = None
     try:
-        dna_files = collect_dna_files(args.dna)
+        dna_path = args.dna
+        if args.zip:
+            tmp_dir = os.path.join(os.getcwd(), "tmp_parasyte_zip")
+            os.makedirs(tmp_dir, exist_ok=True)
+            if RICH_AVAILABLE:
+                console.print(f"[yellow]Zipping target '{dna_path}'...[/yellow]")
+            else:
+                print(f"Zipping target '{dna_path}'...")
+            base_name = os.path.join(tmp_dir, os.path.basename(os.path.normpath(dna_path)))
+            
+            if os.path.isdir(dna_path):
+                shutil.make_archive(base_name, 'zip', dna_path)
+                dna_path = base_name + ".zip"
+            else:
+                dna_path = base_name + ".zip"
+                with zipfile.ZipFile(dna_path, 'w') as zf:
+                    zf.write(args.dna, arcname=os.path.basename(args.dna))
+                    
+        dna_files = collect_dna_files(dna_path)
         carriers = collect_carriers(args.carrier)
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+        if RICH_AVAILABLE:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+        else:
+            print(f"Error: {e}")
+        if tmp_dir and os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir)
         sys.exit(1)
 
     hive_dir = args.hive
@@ -194,6 +230,9 @@ def cmd_infect(args):
         console.print(f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) infected successfully")
     console.print(f"Output directory: {os.path.abspath(hive_dir)}")
     console.print(f"To cure: [bold cyan]{CMD_PREFIX} cure --input {hive_dir}[/bold cyan]")
+    
+    if tmp_dir and os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
 
 
 def cmd_cure(args):
@@ -238,7 +277,7 @@ def cmd_cure(args):
         task = progress.add_task("Processing...", total=total)
         
         for poly_file in polyglot_files:
-            success, msg = cure_single(poly_file, hive_dir, password)
+            success, msg = cure_single(poly_file, hive_dir, password, unzip=args.unzip)
             if success:
                 success_count += 1
                 progress.console.print(f"[green][ SUCCESS ][/green] {msg}", highlight=False)
@@ -331,10 +370,12 @@ Examples:
     infect_parser.add_argument("--carrier", default=DEFAULT_CARRIER_DIR, help=f"Carrier folder (default: {DEFAULT_CARRIER_DIR}/)")
     infect_parser.add_argument("--hive", default=DEFAULT_HIVE_DIR, help=f"Output folder (default: {DEFAULT_HIVE_DIR}/)")
     infect_parser.add_argument("--shred", action="store_true", help="Securely destroy original DNA files")
+    infect_parser.add_argument("--zip", action="store_true", help="Zip the DNA folder/file before encrypting")
 
     cure_parser = subparsers.add_parser("cure", help="Cure infected files to extract original DNA")
     cure_parser.add_argument("--input", required=True, help="Infected file or folder")
     cure_parser.add_argument("--hive", default=None, help="Output folder (default: <input_path>/cured/)")
+    cure_parser.add_argument("--unzip", action="store_true", help="Automatically unzip extracted payload if it's a valid ZIP")
 
     update_parser = subparsers.add_parser("update", help="Update Parasyte to the latest version directly from GitHub")
 
