@@ -16,12 +16,12 @@ TAG_SIZE = 16
 KDF_ITERATIONS = 600_000
 KEY_SIZE = 32  # AES-256
 
-DEFAULT_CARRIER_DIR = "carriers"
+DEFAULT_SEL_DIR = "sel"
 DEFAULT_HIVE_DIR = "hive"
 
 JPEG_END_MARKER = b"\xff\xd9"
 
-CARRIER_EXTENSIONS = {
+SEL_EXTENSIONS = {
     "jpeg": [".jpg", ".jpeg"],
     "png": [".png"],
     "mp4": [".mp4"],
@@ -30,7 +30,7 @@ CARRIER_EXTENSIONS = {
     "wav": [".wav"],
 }
 
-ALL_CARRIER_EXTS = [ext for exts in CARRIER_EXTENSIONS.values() for ext in exts]
+ALL_SEL_EXTS = [ext for exts in SEL_EXTENSIONS.values() for ext in exts]
 
 
 # ─── Crypto Helpers ──────────────────────────────────────────────────────────
@@ -48,8 +48,8 @@ def derive_key(password: str, salt: bytes) -> bytes:
 
 # ─── Polyglot Helpers ────────────────────────────────────────────────────────
 
-def detect_carrier_type(filepath: str) -> str:
-    """Detect carrier type from magic bytes first, fallback to file extension."""
+def detect_sel_type(filepath: str) -> str:
+    """Detect sel type from magic bytes first, fallback to file extension."""
     try:
         with open(filepath, "rb") as f:
             header = f.read(12)
@@ -61,16 +61,16 @@ def detect_carrier_type(filepath: str) -> str:
         pass
 
     ext = os.path.splitext(filepath)[1].lower()
-    for carrier_type, extensions in CARRIER_EXTENSIONS.items():
+    for sel_type, extensions in SEL_EXTENSIONS.items():
         if ext in extensions:
-            return carrier_type
-    raise ValueError(f"Unsupported carrier format: {ext}")
+            return sel_type
+    raise ValueError(f"Unsupported sel format: {ext}")
 
 
-def is_carrier_file(filepath: str) -> bool:
-    """Check if a file has a supported carrier extension."""
+def is_sel_file(filepath: str) -> bool:
+    """Check if a file has a supported sel extension."""
     ext = os.path.splitext(filepath)[1].lower()
-    return ext in ALL_CARRIER_EXTS
+    return ext in ALL_SEL_EXTS
 
 
 def find_jpeg_end(data: bytes) -> int:
@@ -90,14 +90,14 @@ def find_png_end(data: bytes) -> int:
 
 
 def build_polyglot(
-    carrier_data: bytes,
-    carrier_path: str,
+    sel_data: bytes,
+    sel_path: str,
     original_filename: str,
     original_data: bytes,
     password: str,
 ) -> bytes:
     """Build a polyglot media file."""
-    carrier_type = detect_carrier_type(carrier_path)
+    sel_type = detect_sel_type(sel_path)
     
     salt = get_random_bytes(SALT_SIZE)
     key = derive_key(password, salt)
@@ -114,14 +114,14 @@ def build_polyglot(
     
     payload = signature + cipher.nonce + tag + ciphertext + salt
 
-    if carrier_type == "jpeg":
-        jpeg_end = find_jpeg_end(carrier_data)
-        return carrier_data[:jpeg_end] + payload
-    elif carrier_type == "png":
-        png_end = find_png_end(carrier_data)
-        return carrier_data[:png_end] + payload
+    if sel_type == "jpeg":
+        jpeg_end = find_jpeg_end(sel_data)
+        return sel_data[:jpeg_end] + payload
+    elif sel_type == "png":
+        png_end = find_png_end(sel_data)
+        return sel_data[:png_end] + payload
     else:
-        return carrier_data + payload
+        return sel_data + payload
 
 
 def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
@@ -175,25 +175,25 @@ def secure_shred(filepath: str):
 
 # ─── File Discovery ──────────────────────────────────────────────────────────
 
-def collect_carriers(carrier_path: str) -> list[str]:
-    """Collect all carrier files from a directory (recursive)."""
-    if os.path.isfile(carrier_path):
-        if is_carrier_file(carrier_path):
-            return [os.path.abspath(carrier_path)]
+def collect_sel_files(sel_path: str) -> list[str]:
+    """Collect all sel files from a directory (recursive)."""
+    if os.path.isfile(sel_path):
+        if is_sel_file(sel_path):
+            return [os.path.abspath(sel_path)]
         else:
-            raise ValueError(f"File '{carrier_path}' is not a supported carrier format. Supported: {', '.join(ALL_CARRIER_EXTS)}")
+            raise ValueError(f"File '{sel_path}' is not a supported sel format. Supported: {', '.join(ALL_SEL_EXTS)}")
 
-    carriers = []
-    for root, _, files in os.walk(carrier_path):
+    sel_files = []
+    for root, _, files in os.walk(sel_path):
         for f in files:
             filepath = os.path.join(root, f)
-            if is_carrier_file(filepath):
-                carriers.append(os.path.abspath(filepath))
+            if is_sel_file(filepath):
+                sel_files.append(os.path.abspath(filepath))
 
-    if not carriers:
-        raise FileNotFoundError(f"No carrier files found in '{carrier_path}'. Supported: {', '.join(ALL_CARRIER_EXTS)}")
+    if not sel_files:
+        raise FileNotFoundError(f"No sel files found in '{sel_path}'. Supported: {', '.join(ALL_SEL_EXTS)}")
 
-    return sorted(carriers)
+    return sorted(sel_files)
 
 
 def collect_dna_files(dna_path: str) -> list[str]:
@@ -230,7 +230,7 @@ def collect_polyglot_files(input_path: str) -> list[str]:
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for f in filenames:
             filepath = os.path.join(root, f)
-            if is_carrier_file(filepath):
+            if is_sel_file(filepath):
                 files.append(os.path.abspath(filepath))
 
     if not files:
@@ -239,17 +239,17 @@ def collect_polyglot_files(input_path: str) -> list[str]:
     return sorted(files)
 
 
-def assign_carriers(data_files: list[str], carriers: list[str]) -> list[str]:
-    """Assign a random carrier to each data file."""
+def assign_sel_files(data_files: list[str], sel_files: list[str]) -> list[str]:
+    """Assign a random sel to each data file."""
     n_data = len(data_files)
-    n_carriers = len(carriers)
+    n_sel_files = len(sel_files)
 
-    if n_data <= n_carriers:
-        assigned = random.sample(carriers, n_data)
+    if n_data <= n_sel_files:
+        assigned = random.sample(sel_files, n_data)
     else:
-        assigned = list(carriers)
-        remaining = n_data - n_carriers
-        assigned.extend(random.choices(carriers, k=remaining))
+        assigned = list(sel_files)
+        remaining = n_data - n_sel_files
+        assigned.extend(random.choices(sel_files, k=remaining))
         random.shuffle(assigned)
 
     return assigned
