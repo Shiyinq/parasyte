@@ -229,7 +229,7 @@ def cmd_infect(args):
     else:
         console.print(f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) infected successfully")
     console.print(f"Output directory: {os.path.abspath(hive_dir)}")
-    console.print(f"To cure: [bold cyan]{CMD_PREFIX} cure --inang {hive_dir}[/bold cyan]")
+    console.print(f"To cure: [bold cyan]{CMD_PREFIX} cure --host {hive_dir}[/bold cyan]")
     
     if tmp_dir and os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -237,12 +237,12 @@ def cmd_infect(args):
 
 def cmd_cure(args):
     try:
-        polyglot_files = collect_polyglot_files(args.inang)
+        polyglot_files = collect_polyglot_files(args.host)
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
 
-    input_path = args.inang
+    input_path = args.host
     if args.hive:
         hive_dir = args.hive
     else:
@@ -252,7 +252,7 @@ def cmd_cure(args):
             hive_dir = os.path.join(os.path.dirname(input_path) or ".", "cured")
 
     table = Table(title="Curing Plan", title_justify="left", box=box.SIMPLE, show_header=False)
-    table.add_row("Infected Files", f"{len(polyglot_files)} file(s) from '{args.inang}'")
+    table.add_row("Infected Files", f"{len(polyglot_files)} file(s) from '{args.host}'")
     table.add_row("Output Directory", hive_dir)
     
     console.print()
@@ -358,7 +358,7 @@ def main():
         epilog=f"""
 Examples:
   {CMD_PREFIX} infect --dna secret.png
-  {CMD_PREFIX} cure --inang hive/
+  {CMD_PREFIX} cure --host hive/
         """,
     )
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {VERSION}")
@@ -373,7 +373,7 @@ Examples:
     infect_parser.add_argument("--chromosome", action="store_true", help="Condense (zip) the DNA folder/file before encrypting")
 
     cure_parser = subparsers.add_parser("cure", help="Cure infected files to extract original DNA")
-    cure_parser.add_argument("--inang", required=True, help="Infected file or folder (Host)")
+    cure_parser.add_argument("--host", required=True, help="Infected file or folder (Host)")
     cure_parser.add_argument("--hive", default=None, help="Output folder (default: <input_path>/cured/)")
     cure_parser.add_argument("--helicase", action="store_true", help="Unwind (unzip) extracted payload if it's a valid condensed chromosome (ZIP)")
 
