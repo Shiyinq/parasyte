@@ -66,82 +66,55 @@ Parasyte appends encrypted data **after** these boundaries. The result is a file
 
 ### Encryption Flow
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌──────────────────────────────┐
-│  Your Secret    │     │   Password   │     │      Carrier File            │
-│  (any file)     │     │              │     │  (JPEG/PNG/MP4/MKV/MP3/WAV)  │
-└────────┬────────┘     └──────┬───────┘     └──────────────┬───────────────┘
-         │                     │                            │
-         ▼                     ▼                            │
-   Read as binary      PBKDF2 (600K iterations)             │
-         │              + random salt                       │
-         │                     │                            │
-         │                     ▼                            │
-         │              256-bit AES key                     │
-         │                     │                            │
-         ▼                     ▼                            ▼
-   ┌───────────────────────────────────┐    ┌───────────────────────────┐
-   │  AES-256-GCM Encrypt             │    │  Find media boundary      │
-   │  → ciphertext + auth tag         │    │  (JPEG/PNG: after end tag)│
-   └──────────────┬────────────────────┘    │  (Audio/Video: end of file│
-                  │                         └─────────────┬─────────────┘
-                  ▼                                       │
-   ┌──────────────────────────────┐                       │
-   │  Build Payload:              │                       │
-   │  Key-Derived Signature (8B)  │                       │
-   │  + filename + nonce + tag    │                       │
-   │  + ciphertext + salt         │                       │
-   └──────────────┬───────────────┘                       │
-                  │                                       │
-                  ▼                                       ▼
-            ┌─────────────────────────────────────────────────┐
-            │  Carrier media data  +  Encrypted payload       │
-            │  (looks normal)         (invisible to viewers)  │
-            └─────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                           Output polyglot file
-                      (opens normally as image/video)
+```mermaid
+flowchart TD
+    Secret["Your Secret<br>(any file)"] --> ReadBin["Read as binary"]
+    Pass["Password"] --> PBKDF2["PBKDF2 (600K iterations)<br>+ random salt"]
+    Carrier["Carrier File<br>(JPEG/PNG/MP4/MKV/MP3/WAV)"] --> FindBoundary["Find media boundary<br>(JPEG/PNG: after end tag)<br>(Audio/Video: end of file)"]
+
+    PBKDF2 --> AESKey["256-bit AES key"]
+    
+    ReadBin --> Encrypt["AES-256-GCM Encrypt<br>→ ciphertext + auth tag"]
+    AESKey --> Encrypt
+    
+    Encrypt --> Payload["Build Payload:<br>Key-Derived Signature (8B)<br>+ filename + nonce + tag<br>+ ciphertext + salt"]
+    
+    Payload --> Merge["Carrier media data + Encrypted payload<br>(looks normal, invisible to viewers)"]
+    FindBoundary --> Merge
+    
+    Merge --> Output["Output polyglot file<br>(opens normally as image/video)"]
 ```
 
 ### Decryption Flow
 
-```
-Polyglot file  →  Find 16-byte salt at end of file
-                                                    │
-                                    Password + PBKDF2 → AES key
-                                                    │
-                                     Generate expected signature
-                                                    │
-                                         Find payload boundary
-                                                    │
-                                          ┌─────────┴─────────┐
-                                          │  nonce + tag      │
-                                          │  + ciphertext     │
-                                          └─────────┬─────────┘
-                                                    │
-                                            AES-256-GCM Decrypt
-                                                    │
-                                            Original file restored
-                                          (byte-for-byte identical)
+```mermaid
+flowchart TD
+    Polyglot["Polyglot file"] --> Salt["Find 16-byte salt at end of file"]
+    Salt --> AESKey["Password + PBKDF2 → AES key"]
+    AESKey --> Sig["Generate expected signature"]
+    Sig --> Boundary["Find payload boundary"]
+    Boundary --> Extract["Extract:<br>nonce + tag<br>+ ciphertext"]
+    Extract --> Decrypt["AES-256-GCM Decrypt"]
+    Decrypt --> Restored["Original file restored<br>(byte-for-byte identical)"]
 ```
 
 ### File Structure
 
-```
-┌─────────────────────────────────────┐
-│  Original Media Data                │  ← Image viewer / video player reads this
-│  (JPEG/PNG: up to end markers)     │
-│  (Audio/Video: full container)     │
-├─────────────────────────────────────┤
-│  Signature    (8 bytes)            │  ← Key-derived random signature
-│  Filename Len (2 bytes, big-endian) │  ← Original filename length
-│  Filename     (N bytes, UTF-8)     │  ← Original filename preserved
-│  Nonce        (12 bytes)           │  ← AES-GCM random nonce
-│  Auth Tag     (16 bytes)           │  ← AES-GCM authentication tag
-│  Ciphertext   (variable)          │  ← Encrypted file data
-│  Salt         (16 bytes)           │  ← PBKDF2 random salt (at the very end)
-└─────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph PolyglotFileStructure [Polyglot File Structure]
+        direction TB
+        Media["<b>Original Media Data</b><br>(JPEG/PNG: up to end markers)<br>(Audio/Video: full container)<br><i>Image viewer / video player reads this</i>"]
+        Sig["<b>Signature</b> (8 bytes)<br><i>Key-derived random signature</i>"]
+        FileLen["<b>Filename Len</b> (2 bytes, big-endian)<br><i>Original filename length</i>"]
+        FileName["<b>Filename</b> (N bytes, UTF-8)<br><i>Original filename preserved</i>"]
+        Nonce["<b>Nonce</b> (12 bytes)<br><i>AES-GCM random nonce</i>"]
+        AuthTag["<b>Auth Tag</b> (16 bytes)<br><i>AES-GCM authentication tag</i>"]
+        Ciphertext["<b>Ciphertext</b> (variable)<br><i>Encrypted file data</i>"]
+        Salt["<b>Salt</b> (16 bytes)<br><i>PBKDF2 random salt (at the very end)</i>"]
+        
+        Media --- Sig --- FileLen --- FileName --- Nonce --- AuthTag --- Ciphertext --- Salt
+    end
 ```
 
 ---
