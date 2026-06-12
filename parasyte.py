@@ -415,4 +415,11 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        if RICH_AVAILABLE:
+            console.print("\n[bold red]Cancelled.[/bold red]")
+        else:
+            print("\nCancelled.")
+        sys.exit(130)
