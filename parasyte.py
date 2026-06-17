@@ -12,12 +12,14 @@ import sys
 import subprocess
 import shutil
 import zipfile
+from typing import Optional
 
 from version import __version__ as VERSION
 from core import (
     DEFAULT_SEL_DIR,
     DEFAULT_HIVE_DIR,
     build_polyglot,
+    build_raw_payload,
     cure_and_extract,
     secure_shred,
     collect_sel_files,
@@ -51,12 +53,12 @@ else:
 
 def infect_single(
     dna_path: str,
-    sel_path: str,
     hive_dir: str,
     password: str,
+    sel_path: Optional[str] = None,
     shred: bool = False,
 ) -> tuple[bool, str]:
-    """Infect a single sel with the DNA payload."""
+    """Encrypt a single DNA file. If sel_path given, embed in media; else raw .psyt."""
     try:
         dna_name = os.path.basename(dna_path)
         original_size = os.path.getsize(dna_path)
@@ -64,17 +66,19 @@ def infect_single(
         with open(dna_path, "rb") as f:
             dna_data = f.read()
 
-        with open(sel_path, "rb") as f:
-            sel_data = f.read()
+        if sel_path:
+            with open(sel_path, "rb") as f:
+                sel_data = f.read()
+            payload = build_polyglot(sel_data, sel_path, dna_name, dna_data, password)
+            output_filename = os.path.basename(sel_path)
+        else:
+            payload = build_raw_payload(dna_name, dna_data, password)
+            output_filename = os.urandom(6).hex() + ".psyt"
 
-        polyglot = build_polyglot(sel_data, sel_path, dna_name, dna_data, password)
-
-        sel_name = os.path.basename(sel_path)
-        output_filename = sel_name
         output_path = os.path.join(hive_dir, output_filename)
 
         if os.path.exists(output_path):
-            name, ext = os.path.splitext(sel_name)
+            name, ext = os.path.splitext(output_filename)
             counter = 1
             while os.path.exists(output_path):
                 output_filename = f"{name}_{counter}{ext}"
@@ -83,12 +87,12 @@ def infect_single(
 
         os.makedirs(hive_dir, exist_ok=True)
         with open(output_path, "wb") as f:
-            f.write(polyglot)
+            f.write(payload)
 
         if shred:
             secure_shred(dna_path)
 
-        msg = f"{dna_name} -> {output_filename} ({original_size:,} -> {len(polyglot):,} bytes)"
+        msg = f"{dna_name} -> {output_filename} ({original_size:,} -> {len(payload):,} bytes)"
         return True, msg
 
     except Exception as e:
@@ -169,7 +173,8 @@ def cmd_infect(args):
                     zf.write(args.dna, arcname=os.path.basename(args.dna))
                     
         dna_files = collect_dna_files(dna_path)
-        sel_files = collect_sel_files(args.sel)
+        if not args.raw:
+            sel_files = collect_sel_files(args.sel)
     except Exception as e:
         if RICH_AVAILABLE:
             console.print(f"[bold red]Error:[/bold red] {e}")
@@ -183,7 +188,10 @@ def cmd_infect(args):
 
     table = Table(title="Infection Plan", title_justify="left", box=box.SIMPLE, show_header=False)
     table.add_row("DNA Payload", f"{len(dna_files)} file(s) from '{args.dna}'")
-    table.add_row("Sels", f"{len(sel_files)} file(s) from '{args.sel}'")
+    if args.raw:
+        table.add_row("Mode", "Raw Binary (.psyt)")
+    else:
+        table.add_row("Sels", f"{len(sel_files)} file(s) from '{args.sel}'")
     table.add_row("Hive Output", hive_dir)
     table.add_row("Encryption", "AES-256-GCM (PBKDF2 600,000 iterations)")
     
@@ -197,7 +205,8 @@ def cmd_infect(args):
         console.print("[bold red]Error:[/bold red] Passwords do not match!")
         sys.exit(1)
 
-    assigned_sel_files = assign_sel_files(dna_files, sel_files)
+    if not args.raw:
+        assigned_sel_files = assign_sel_files(dna_files, sel_files)
 
     console.print("\n[bold]Infecting...[/bold]")
     
@@ -214,8 +223,11 @@ def cmd_infect(args):
     ) as progress:
         task = progress.add_task("Processing...", total=total)
         
-        for dna_file, sel_file in zip(dna_files, assigned_sel_files):
-            success, msg = infect_single(dna_file, sel_file, hive_dir, password, args.shred)
+        for idx, dna_file in enumerate(dna_files):
+            if args.raw:
+                success, msg = infect_single(dna_file, hive_dir, password, shred=args.shred)
+            else:
+                success, msg = infect_single(dna_file, hive_dir, password, sel_path=assigned_sel_files[idx], shred=args.shred)
             if success:
                 success_count += 1
                 progress.console.print(f"[green][ SUCCESS ][/green] {msg}", highlight=False)
@@ -379,6 +391,7 @@ Examples:
     infect_parser.add_argument("--hive", default=DEFAULT_HIVE_DIR, help=f"Output folder (default: {DEFAULT_HIVE_DIR}/)")
     infect_parser.add_argument("--shred", action="store_true", help="Securely destroy original DNA files")
     infect_parser.add_argument("--chromosome", action="store_true", help="Condense (zip) the DNA folder/file before encrypting")
+    infect_parser.add_argument("--raw", action="store_true", help="Encrypt to raw .psyt binary (no media disguise)")
 
     cure_parser = subparsers.add_parser("cure", help="Cure infected files to extract original DNA")
     cure_parser.add_argument("--host", required=True, help="Infected file or folder (Host)")

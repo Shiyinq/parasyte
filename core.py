@@ -32,6 +32,10 @@ SEL_EXTENSIONS = {
 
 ALL_SEL_EXTS = [ext for exts in SEL_EXTENSIONS.values() for ext in exts]
 
+RAW_ENCRYPTED_EXTS = [".psyt"]
+
+ALL_POLYGLOT_EXTS = set(ALL_SEL_EXTS) | set(RAW_ENCRYPTED_EXTS)
+
 
 # ─── Crypto Helpers ──────────────────────────────────────────────────────────
 
@@ -89,6 +93,27 @@ def find_png_end(data: bytes) -> int:
     return pos + 12
 
 
+def _encrypt_payload(
+    original_filename: str,
+    original_data: bytes,
+    password: str,
+) -> bytes:
+    """Encrypt data and return the payload bytes."""
+    salt = get_random_bytes(SALT_SIZE)
+    key = derive_key(password, salt)
+
+    cipher = AES.new(key, AES.MODE_GCM, nonce=get_random_bytes(NONCE_SIZE))
+
+    filename_bytes = original_filename.encode("utf-8")
+    filename_length = struct.pack(">H", len(filename_bytes))
+    data_to_encrypt = filename_length + filename_bytes + original_data
+
+    ciphertext, tag = cipher.encrypt_and_digest(data_to_encrypt)
+
+    signature = hashlib.sha256(key + b"PARASYTE_SIG").digest()[:8]
+    return signature + cipher.nonce + tag + ciphertext + salt
+
+
 def build_polyglot(
     sel_data: bytes,
     sel_path: str,
@@ -98,21 +123,7 @@ def build_polyglot(
 ) -> bytes:
     """Build a polyglot media file."""
     sel_type = detect_sel_type(sel_path)
-    
-    salt = get_random_bytes(SALT_SIZE)
-    key = derive_key(password, salt)
-    
-    cipher = AES.new(key, AES.MODE_GCM, nonce=get_random_bytes(NONCE_SIZE))
-    
-    filename_bytes = original_filename.encode("utf-8")
-    filename_length = struct.pack(">H", len(filename_bytes))
-    data_to_encrypt = filename_length + filename_bytes + original_data
-    
-    ciphertext, tag = cipher.encrypt_and_digest(data_to_encrypt)
-    
-    signature = hashlib.sha256(key + b"PARASYTE_SIG").digest()[:8]
-    
-    payload = signature + cipher.nonce + tag + ciphertext + salt
+    payload = _encrypt_payload(original_filename, original_data, password)
 
     if sel_type == "jpeg":
         jpeg_end = find_jpeg_end(sel_data)
@@ -122,6 +133,15 @@ def build_polyglot(
         return sel_data[:png_end] + payload
     else:
         return sel_data + payload
+
+
+def build_raw_payload(
+    original_filename: str,
+    original_data: bytes,
+    password: str,
+) -> bytes:
+    """Build a standalone encrypted payload without media embedding."""
+    return _encrypt_payload(original_filename, original_data, password)
 
 
 def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
@@ -230,11 +250,12 @@ def collect_polyglot_files(input_path: str) -> list[str]:
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for f in filenames:
             filepath = os.path.join(root, f)
-            if is_sel_file(filepath):
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext in ALL_SEL_EXTS or ext in RAW_ENCRYPTED_EXTS:
                 files.append(os.path.abspath(filepath))
 
     if not files:
-        raise FileNotFoundError(f"No media files found in '{input_path}'")
+        raise FileNotFoundError(f"No infected files found in '{input_path}'")
 
     return sorted(files)
 
