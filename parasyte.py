@@ -8,48 +8,55 @@ Encrypt any file and embed the encrypted data inside a media file
 import argparse
 import hashlib
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 import zipfile
 from typing import Optional
 
-from version import __version__ as VERSION
 from core import (
-    DEFAULT_SEL_DIR,
-    DEFAULT_HIVE_DIR,
+    assign_sel_files,
     build_polyglot,
     build_raw_payload,
-    cure_and_extract,
-    secure_shred,
-    collect_sel_files,
     collect_dna_files,
     collect_polyglot_files,
-    assign_sel_files,
-    detect_sel_type,
+    collect_sel_files,
+    cure_and_extract,
+    secure_shred,
 )
+from version import __version__ as VERSION
 
 # Optional rich import, with fallback if not installed yet
 try:
-    from rich.console import Console
-    from rich.table import Table
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-    from rich.prompt import Prompt
     from rich import box
+    from rich.console import Console
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+    from rich.prompt import Prompt
+    from rich.table import Table
+
     RICH_AVAILABLE = True
     console = Console()
 except ImportError:
     RICH_AVAILABLE = False
-    print("Warning: 'rich' library not found. Please run 'pip install -r requirements.txt'")
+    print(
+        "Warning: 'rich' library not found. Please run 'pip install -r requirements.txt'"
+    )
     sys.exit(1)
 
 # Dynamically determine how the script was invoked for accurate help messages
-if sys.argv[0].endswith('.py'):
+if sys.argv[0].endswith(".py"):
     CMD_PREFIX = f"python {os.path.basename(sys.argv[0])}"
 else:
     CMD_PREFIX = os.path.basename(sys.argv[0])
 
 # ─── Commands ────────────────────────────────────────────────────────────────
+
 
 def infect_single(
     dna_path: str,
@@ -113,7 +120,9 @@ def cure_single(
             polyglot_data = f.read()
 
         try:
-            original_filename, decrypted_data = cure_and_extract(polyglot_data, password)
+            original_filename, decrypted_data = cure_and_extract(
+                polyglot_data, password
+            )
         except ValueError as e:
             if "Key-derived signature mismatch" in str(e):
                 return False, f"Skipped {polyglot_name} (Not infected / Wrong password)"
@@ -136,17 +145,22 @@ def cure_single(
         if helicase and zipfile.is_zipfile(output_path):
             extract_dir = os.path.join(hive_dir, name)
             os.makedirs(extract_dir, exist_ok=True)
-            with zipfile.ZipFile(output_path, 'r') as zip_ref:
+            with zipfile.ZipFile(output_path, "r") as zip_ref:
                 zip_ref.extractall(extract_dir)
             os.remove(output_path)
             msg_suffix = f" (unzipped to '{name}/')"
 
         short_hash = hashlib.sha256(decrypted_data).hexdigest()[:6]
-        msg = f"{polyglot_name} -> {original_filename} (sha256:{short_hash}){msg_suffix}"
+        msg = (
+            f"{polyglot_name} -> {original_filename} (sha256:{short_hash}){msg_suffix}"
+        )
         return True, msg
 
     except (ValueError, KeyError):
-        return False, f"{os.path.basename(polyglot_path)}: Wrong password or corrupted data"
+        return (
+            False,
+            f"{os.path.basename(polyglot_path)}: Wrong password or corrupted data",
+        )
     except Exception as e:
         return False, f"{os.path.basename(polyglot_path)}: {str(e)}"
 
@@ -162,16 +176,18 @@ def cmd_infect(args):
                 console.print(f"[yellow]Zipping target '{dna_path}'...[/yellow]")
             else:
                 print(f"Zipping target '{dna_path}'...")
-            base_name = os.path.join(tmp_dir, os.path.basename(os.path.normpath(dna_path)))
-            
+            base_name = os.path.join(
+                tmp_dir, os.path.basename(os.path.normpath(dna_path))
+            )
+
             if os.path.isdir(dna_path):
-                shutil.make_archive(base_name, 'zip', dna_path)
+                shutil.make_archive(base_name, "zip", dna_path)
                 dna_path = base_name + ".zip"
             else:
                 dna_path = base_name + ".zip"
-                with zipfile.ZipFile(dna_path, 'w') as zf:
+                with zipfile.ZipFile(dna_path, "w") as zf:
                     zf.write(args.dna, arcname=os.path.basename(args.dna))
-                    
+
         dna_files = collect_dna_files(dna_path)
         if not args.raw:
             sel_files = collect_sel_files(args.sel)
@@ -186,7 +202,9 @@ def cmd_infect(args):
 
     hive_dir = args.hive
 
-    table = Table(title="Infection Plan", title_justify="left", box=box.SIMPLE, show_header=False)
+    table = Table(
+        title="Infection Plan", title_justify="left", box=box.SIMPLE, show_header=False
+    )
     table.add_row("DNA Payload", f"{len(dna_files)} file(s) from '{args.dna}'")
     if args.raw:
         table.add_row("Mode", "Raw Binary (.psyt)")
@@ -194,7 +212,7 @@ def cmd_infect(args):
         table.add_row("Sels", f"{len(sel_files)} file(s) from '{args.sel}'")
     table.add_row("Hive Output", hive_dir)
     table.add_row("Encryption", "AES-256-GCM (PBKDF2 600,000 iterations)")
-    
+
     console.print()
     console.print(table)
     console.print()
@@ -209,40 +227,56 @@ def cmd_infect(args):
         assigned_sel_files = assign_sel_files(dna_files, sel_files)
 
     console.print("\n[bold]Infecting...[/bold]")
-    
+
     success_count = 0
     total = len(dna_files)
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
-        console=console
+        console=console,
     ) as progress:
         task = progress.add_task("Processing...", total=total)
-        
+
         for idx, dna_file in enumerate(dna_files):
             if args.raw:
-                success, msg = infect_single(dna_file, hive_dir, password, shred=args.shred)
+                success, msg = infect_single(
+                    dna_file, hive_dir, password, shred=args.shred
+                )
             else:
-                success, msg = infect_single(dna_file, hive_dir, password, sel_path=assigned_sel_files[idx], shred=args.shred)
+                success, msg = infect_single(
+                    dna_file,
+                    hive_dir,
+                    password,
+                    sel_path=assigned_sel_files[idx],
+                    shred=args.shred,
+                )
             if success:
                 success_count += 1
-                progress.console.print(f"[green][ SUCCESS ][/green] {msg}", highlight=False)
+                progress.console.print(
+                    f"[green][ SUCCESS ][/green] {msg}", highlight=False
+                )
             else:
                 progress.console.print(f"[red][ ERROR ][/red] {msg}", highlight=False)
             progress.advance(task)
 
     console.print()
     if success_count == total:
-        console.print(f"[bold green]Done:[/bold green] {success_count}/{total} file(s) infected successfully")
+        console.print(
+            f"[bold green]Done:[/bold green] {success_count}/{total} file(s) infected successfully"
+        )
     else:
-        console.print(f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) infected successfully")
+        console.print(
+            f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) infected successfully"
+        )
     console.print(f"Output directory: {os.path.abspath(hive_dir)}")
-    console.print(f"To cure: [bold cyan]{CMD_PREFIX} cure --host {hive_dir}[/bold cyan]")
-    
+    console.print(
+        f"To cure: [bold cyan]{CMD_PREFIX} cure --host {hive_dir}[/bold cyan]"
+    )
+
     if tmp_dir and os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
 
@@ -263,10 +297,12 @@ def cmd_cure(args):
         else:
             hive_dir = os.path.join(os.path.dirname(input_path) or ".", "cured")
 
-    table = Table(title="Curing Plan", title_justify="left", box=box.SIMPLE, show_header=False)
+    table = Table(
+        title="Curing Plan", title_justify="left", box=box.SIMPLE, show_header=False
+    )
     table.add_row("Infected Files", f"{len(polyglot_files)} file(s) from '{args.host}'")
     table.add_row("Output Directory", hive_dir)
-    
+
     console.print()
     console.print(table)
     console.print()
@@ -274,34 +310,44 @@ def cmd_cure(args):
     password = Prompt.ask("Enter password", password=True)
 
     console.print("\n[bold]Curing...[/bold]")
-    
+
     success_count = 0
     total = len(polyglot_files)
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
-        console=console
+        console=console,
     ) as progress:
         task = progress.add_task("Processing...", total=total)
-        
+
         for poly_file in polyglot_files:
-            success, msg = cure_single(poly_file, hive_dir, password, helicase=args.helicase)
+            success, msg = cure_single(
+                poly_file, hive_dir, password, helicase=args.helicase
+            )
             if success:
                 success_count += 1
-                progress.console.print(f"[green][ SUCCESS ][/green] {msg}", highlight=False)
+                progress.console.print(
+                    f"[green][ SUCCESS ][/green] {msg}", highlight=False
+                )
             else:
-                progress.console.print(f"[yellow][ SKIPPED/ERROR ][/yellow] {msg}", highlight=False)
+                progress.console.print(
+                    f"[yellow][ SKIPPED/ERROR ][/yellow] {msg}", highlight=False
+                )
             progress.advance(task)
 
     console.print()
     if success_count == total:
-        console.print(f"[bold green]Done:[/bold green] {success_count}/{total} file(s) cured successfully")
+        console.print(
+            f"[bold green]Done:[/bold green] {success_count}/{total} file(s) cured successfully"
+        )
     else:
-        console.print(f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) cured successfully")
+        console.print(
+            f"[bold yellow]Done:[/bold yellow] {success_count}/{total} file(s) cured successfully"
+        )
     console.print(f"Cured output at: {os.path.abspath(hive_dir)}")
 
 
@@ -310,13 +356,13 @@ def cmd_update(args):
         print("Checking for updates on GitHub...")
     else:
         console.print("[yellow]Checking for updates on GitHub...[/yellow]")
-        
+
     try:
         # Use curl to get the latest tag from the redirect Location header
         cmd_latest = "curl -sI https://github.com/Shiyinq/parasyte/releases/latest | grep -i '^location:' | sed -E 's/.*\\/tag\\/([^[:space:]\\r]*).*/\\1/'"
         result = subprocess.run(cmd_latest, shell=True, capture_output=True, text=True)
         latest_tag = result.stdout.strip()
-        
+
         if not latest_tag:
             msg = "Error: Could not determine the latest version from GitHub."
             if RICH_AVAILABLE:
@@ -324,7 +370,7 @@ def cmd_update(args):
             else:
                 print(msg)
             sys.exit(1)
-            
+
         if latest_tag == VERSION:
             msg = f"You are already using the latest version ({VERSION})."
             if RICH_AVAILABLE:
@@ -335,23 +381,31 @@ def cmd_update(args):
         else:
             if RICH_AVAILABLE:
                 console.print(f"[green]Update found![/green] {VERSION} -> {latest_tag}")
-                console.print("Running automated install script (this may require sudo password)...")
+                console.print(
+                    "Running automated install script (this may require sudo password)..."
+                )
             else:
                 print(f"Update found! {VERSION} -> {latest_tag}")
-                print("Running automated install script (this may require sudo password)...")
-            
+                print(
+                    "Running automated install script (this may require sudo password)..."
+                )
+
             # Execute the bash script
             install_cmd = "curl -fsSL https://raw.githubusercontent.com/Shiyinq/parasyte/main/install.sh | bash"
             subprocess.run(install_cmd, shell=True)
-            
-            release_url = f"https://github.com/Shiyinq/parasyte/releases/tag/{latest_tag}"
+
+            release_url = (
+                f"https://github.com/Shiyinq/parasyte/releases/tag/{latest_tag}"
+            )
             if RICH_AVAILABLE:
                 console.print(f"\n[bold cyan]✨ Update complete![/bold cyan]")
-                console.print(f"View what's new in {latest_tag}: [link={release_url}]{release_url}[/link]")
+                console.print(
+                    f"View what's new in {latest_tag}: [link={release_url}]{release_url}[/link]"
+                )
             else:
                 print(f"\n✨ Update complete!")
                 print(f"View what's new in {latest_tag}: {release_url}")
-            
+
     except Exception as e:
         msg = f"Failed to check for updates: {e}"
         if RICH_AVAILABLE:
@@ -363,10 +417,11 @@ def cmd_update(args):
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
+
 def main():
     # Only add these if we don't have them imported (to avoid duplicate defaults if core is missing)
     try:
-        from core import DEFAULT_SEL_DIR, DEFAULT_HIVE_DIR
+        from core import DEFAULT_HIVE_DIR, DEFAULT_SEL_DIR
     except ImportError:
         DEFAULT_SEL_DIR = "sel_files"
         DEFAULT_HIVE_DIR = "hive"
@@ -381,24 +436,60 @@ Examples:
   {CMD_PREFIX} cure --host hive/
         """,
     )
-    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {VERSION}")
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {VERSION}"
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    infect_parser = subparsers.add_parser("infect", help="Infect sel media with encrypted DNA payload")
-    infect_parser.add_argument("--dna", required=True, help="DNA payload (file or folder)")
-    infect_parser.add_argument("--sel", default=DEFAULT_SEL_DIR, help=f"Sel folder (default: {DEFAULT_SEL_DIR}/)")
-    infect_parser.add_argument("--hive", default=DEFAULT_HIVE_DIR, help=f"Output folder (default: {DEFAULT_HIVE_DIR}/)")
-    infect_parser.add_argument("--shred", action="store_true", help="Securely destroy original DNA files")
-    infect_parser.add_argument("--chromosome", action="store_true", help="Condense (zip) the DNA folder/file before encrypting")
-    infect_parser.add_argument("--raw", action="store_true", help="Encrypt to raw .psyt binary (no media disguise)")
+    infect_parser = subparsers.add_parser(
+        "infect", help="Infect sel media with encrypted DNA payload"
+    )
+    infect_parser.add_argument(
+        "--dna", required=True, help="DNA payload (file or folder)"
+    )
+    infect_parser.add_argument(
+        "--sel",
+        default=DEFAULT_SEL_DIR,
+        help=f"Sel folder (default: {DEFAULT_SEL_DIR}/)",
+    )
+    infect_parser.add_argument(
+        "--hive",
+        default=DEFAULT_HIVE_DIR,
+        help=f"Output folder (default: {DEFAULT_HIVE_DIR}/)",
+    )
+    infect_parser.add_argument(
+        "--shred", action="store_true", help="Securely destroy original DNA files"
+    )
+    infect_parser.add_argument(
+        "--chromosome",
+        action="store_true",
+        help="Condense (zip) the DNA folder/file before encrypting",
+    )
+    infect_parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Encrypt to raw .psyt binary (no media disguise)",
+    )
 
-    cure_parser = subparsers.add_parser("cure", help="Cure infected files to extract original DNA")
-    cure_parser.add_argument("--host", required=True, help="Infected file or folder (Host)")
-    cure_parser.add_argument("--hive", default=None, help="Output folder (default: <input_path>/cured/)")
-    cure_parser.add_argument("--helicase", action="store_true", help="Unwind (unzip) extracted payload if it's a valid condensed chromosome (ZIP)")
+    cure_parser = subparsers.add_parser(
+        "cure", help="Cure infected files to extract original DNA"
+    )
+    cure_parser.add_argument(
+        "--host", required=True, help="Infected file or folder (Host)"
+    )
+    cure_parser.add_argument(
+        "--hive", default=None, help="Output folder (default: <input_path>/cured/)"
+    )
+    cure_parser.add_argument(
+        "--helicase",
+        action="store_true",
+        help="Unwind (unzip) extracted payload if it's a valid condensed chromosome (ZIP)",
+    )
 
-    update_parser = subparsers.add_parser("update", help="Update Parasyte to the latest version directly from GitHub")
+    update_parser = subparsers.add_parser(
+        "update", help="Update Parasyte to the latest version directly from GitHub"
+    )
 
     args = parser.parse_args()
 

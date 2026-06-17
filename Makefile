@@ -1,4 +1,4 @@
-.PHONY: install build clean venv
+.PHONY: install build clean lint
 
 VENV = .venv
 VENV_PYTHON = $(VENV)/bin/python
@@ -29,6 +29,16 @@ install-parasyte:
 	sudo ln -sf /usr/local/lib/parasyte/parasyte.bin /usr/local/bin/parasyte
 	@echo "✅ Installed successfully! You can now type 'parasyte' from anywhere."
 
+.venv/.lint-tools-installed: $(VENV)/bin/activate
+	$(VENV_PIP) install autoflake isort black
+	touch $@
+
+lint: .venv/.lint-tools-installed
+	@if [ -d ".venv" ]; then . .venv/bin/activate; fi; \
+	autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place parasyte.py core.py test_verify.py version.py update_version.py --exclude=__init__.py,_example; \
+	isort parasyte.py core.py test_verify.py version.py update_version.py --profile black; \
+	black parasyte.py core.py test_verify.py version.py update_version.py
+
 clean:
-	rm -rf build/ dist/ __pycache__/ parasyte.build/ parasyte.dist/ parasyte.onefile-build/
+	rm -rf build/ dist/ __pycache__/ parasyte.build/ parasyte.dist/ parasyte.onefile-build/ .venv/.lint-tools-installed
 	@echo "🧹 Clean successfully!"

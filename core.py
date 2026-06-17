@@ -39,6 +39,7 @@ ALL_POLYGLOT_EXTS = set(ALL_SEL_EXTS) | set(RAW_ENCRYPTED_EXTS)
 
 # ─── Crypto Helpers ──────────────────────────────────────────────────────────
 
+
 def derive_key(password: str, salt: bytes) -> bytes:
     """Derive a 256-bit key from password using PBKDF2."""
     return PBKDF2(
@@ -51,6 +52,7 @@ def derive_key(password: str, salt: bytes) -> bytes:
 
 
 # ─── Polyglot Helpers ────────────────────────────────────────────────────────
+
 
 def detect_sel_type(filepath: str) -> str:
     """Detect sel type from magic bytes first, fallback to file extension."""
@@ -152,7 +154,7 @@ def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
     salt = polyglot_data[-SALT_SIZE:]
     key = derive_key(password, salt)
     expected_signature = hashlib.sha256(key + b"PARASYTE_SIG").digest()[:8]
-    
+
     magic_pos = polyglot_data.rfind(expected_signature)
     if magic_pos == -1:
         raise ValueError("Key-derived signature mismatch")
@@ -166,11 +168,11 @@ def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
     tag = hidden[offset : offset + TAG_SIZE]
     offset += TAG_SIZE
 
-    ciphertext = hidden[offset : -SALT_SIZE]
+    ciphertext = hidden[offset:-SALT_SIZE]
 
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     decrypted_blob = cipher.decrypt_and_verify(ciphertext, tag)
-    
+
     filename_length = struct.unpack(">H", decrypted_blob[:2])[0]
     original_filename = decrypted_blob[2 : 2 + filename_length].decode("utf-8")
     decrypted_data = decrypted_blob[2 + filename_length :]
@@ -179,6 +181,7 @@ def cure_and_extract(polyglot_data: bytes, password: str) -> tuple[str, bytes]:
 
 
 # ─── File Operations ─────────────────────────────────────────────────────────
+
 
 def secure_shred(filepath: str):
     """Securely overwrite file with random bytes before deleting."""
@@ -195,13 +198,16 @@ def secure_shred(filepath: str):
 
 # ─── File Discovery ──────────────────────────────────────────────────────────
 
+
 def collect_sel_files(sel_path: str) -> list[str]:
     """Collect all sel files from a directory (recursive)."""
     if os.path.isfile(sel_path):
         if is_sel_file(sel_path):
             return [os.path.abspath(sel_path)]
         else:
-            raise ValueError(f"File '{sel_path}' is not a supported sel format. Supported: {', '.join(ALL_SEL_EXTS)}")
+            raise ValueError(
+                f"File '{sel_path}' is not a supported sel format. Supported: {', '.join(ALL_SEL_EXTS)}"
+            )
 
     sel_files = []
     for root, _, files in os.walk(sel_path):
@@ -211,7 +217,9 @@ def collect_sel_files(sel_path: str) -> list[str]:
                 sel_files.append(os.path.abspath(filepath))
 
     if not sel_files:
-        raise FileNotFoundError(f"No sel files found in '{sel_path}'. Supported: {', '.join(ALL_SEL_EXTS)}")
+        raise FileNotFoundError(
+            f"No sel files found in '{sel_path}'. Supported: {', '.join(ALL_SEL_EXTS)}"
+        )
 
     return sorted(sel_files)
 

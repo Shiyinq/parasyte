@@ -3,6 +3,7 @@ import re
 
 VERSION_FILE = "version.py"
 
+
 def update_version():
     try:
         with open(VERSION_FILE, "r") as f:
@@ -26,7 +27,7 @@ def update_version():
         if current_version == today_base:
             new_version = f"{today_base}.1"
         else:
-            suffix = current_version[len(today_base):]
+            suffix = current_version[len(today_base) :]
             if suffix.startswith("."):
                 try:
                     counter = int(suffix[1:])
@@ -41,15 +42,14 @@ def update_version():
 
     # Replace version in file
     new_content = re.sub(
-        r'__version__\s*=\s*"[^"]+"',
-        f'__version__ = "{new_version}"',
-        content
+        r'__version__\s*=\s*"[^"]+"', f'__version__ = "{new_version}"', content
     )
-    
+
     with open(VERSION_FILE, "w") as f:
         f.write(new_content)
 
     print(f"📦 Version updated: {current_version} ➔ {new_version}")
+
 
 if __name__ == "__main__":
     update_version()

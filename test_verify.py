@@ -8,10 +8,10 @@ from core import (
     assign_sel_files,
     build_polyglot,
     build_raw_payload,
-    collect_sel_files,
     collect_dna_files,
-    detect_sel_type,
+    collect_sel_files,
     cure_and_extract,
+    detect_sel_type,
 )
 
 TEST_PASSWORD = "test_password_123"
@@ -64,8 +64,10 @@ def test_single_roundtrip(dna_path: str, sel_path: str):
     except ValueError:
         pass  # Expected
 
-    print(f"  ✅ {dna_name} + {sel_name} ({sel_type}) — "
-          f"{len(original_dna):,} → {len(polyglot):,} bytes")
+    print(
+        f"  ✅ {dna_name} + {sel_name} ({sel_type}) — "
+        f"{len(original_dna):,} → {len(polyglot):,} bytes"
+    )
 
     return polyglot
 
@@ -96,8 +98,7 @@ def test_raw_roundtrip(dna_path: str):
     except ValueError:
         pass
 
-    print(f"  ✅ [RAW] {dna_name} — "
-          f"{len(original_dna):,} → {len(payload):,} bytes")
+    print(f"  ✅ [RAW] {dna_name} — " f"{len(original_dna):,} → {len(payload):,} bytes")
 
 
 def test_sel_assignment():
@@ -110,7 +111,9 @@ def test_sel_assignment():
     data_3 = ["file1", "file2", "file3"]
     assigned = assign_sel_files(data_3, sel_files)
     assert len(assigned) == 3, f"Expected 3, got {len(assigned)}"
-    assert len(set(assigned)) == 3, "Should have unique sel_files when data <= sel_files"
+    assert (
+        len(set(assigned)) == 3
+    ), "Should have unique sel_files when data <= sel_files"
     print(f"  ✅ 3 data, 5 sel_files → {len(set(assigned))} unique assignments")
 
     # Case 2: data == sel_files
@@ -124,9 +127,13 @@ def test_sel_assignment():
     data_8 = [f"f{i}" for i in range(8)]
     assigned = assign_sel_files(data_8, sel_files)
     assert len(assigned) == 8
-    assert set(sel_files).issubset(set(assigned)), "All sel_files should be used at least once"
-    print(f"  ✅ 8 data, 5 sel_files → {len(assigned)} assignments, "
-          f"{len(set(assigned))} unique sel_files (reuse expected)")
+    assert set(sel_files).issubset(
+        set(assigned)
+    ), "All sel_files should be used at least once"
+    print(
+        f"  ✅ 8 data, 5 sel_files → {len(assigned)} assignments, "
+        f"{len(set(assigned))} unique sel_files (reuse expected)"
+    )
 
     # Case 4: Verify randomness
     results = set()
@@ -161,8 +168,10 @@ def main():
                 test_single_roundtrip(dna_file, sel)
                 passed += 1
             except Exception as e:
-                print(f"  ❌ {os.path.basename(dna_file)} + "
-                      f"{os.path.basename(sel)} — {e}")
+                print(
+                    f"  ❌ {os.path.basename(dna_file)} + "
+                    f"{os.path.basename(sel)} — {e}"
+                )
                 failed += 1
 
     # 3. Test raw encrypt/decrypt roundtrip
