@@ -2,7 +2,7 @@
 
 **Encrypt any file and hide it inside innocent-looking media files.**
 
-Parasyte uses **AES-256-GCM encryption** combined with the **polyglot file technique** to embed encrypted data inside images (JPEG, PNG) and audio/video media (MP4, MKV, MP3, WAV). The output files look and behave completely normal — they open in image viewers and media players — but contain your secret data, recoverable only with the correct password.
+Parasyte uses **AES-256-GCM encryption** combined with the **polyglot file technique** to embed encrypted data inside images (JPEG, PNG) and audio/video media (MP4, MKV, MP3, WAV). The output files look and behave completely normal — they open in image viewers and media players — but contain your secret data, recoverable only with the correct password. For cases where no disguise file is needed, use `--raw` to output a standalone `.psyt` encrypted binary.
 
 ---
 
@@ -49,6 +49,7 @@ To embrace the biological Sci-Fi theme, this CLI uses specialized terms instead 
 | **`--hive`** | **Output Directory** | The folder where the resulting infected (or cured) files will be saved. |
 | **`--chromosome`** | **Zip Compression** | Condenses your DNA folder into a single tight package (ZIP) before infecting. |
 | **`--helicase`** | **Zip Extraction** | Unwinds and automatically extracts the chromosome payload (ZIP) during the cure process. |
+| **`--raw`** | **Raw Binary** | Encrypt without a disguise file — outputs a standalone `.psyt` encrypted binary instead of a polyglot media file. |
 | **`--shred`** | **Secure Delete** | Permanently and securely wipes the original DNA file from your hard drive after a successful infection. |
 
 ---
@@ -166,6 +167,8 @@ make install-parasyte
 
 ## Quick Start
 
+### Polyglot mode (hide inside media)
+
 ```bash
 # 1. Put sel files (JPEG/PNG/MP4/MKV/MP3/WAV) in the sel/ folder
 #    These are the "disguise" files — your secret will be hidden inside them.
@@ -184,6 +187,18 @@ python parasyte.py cure --host hive/example.png
 # → Output: hive/cured/example.png  (identical to the original)
 ```
 
+### Raw mode (standalone encrypted binary)
+
+```bash
+# Encrypt without a disguise file
+python parasyte.py infect --dna secret.pdf --raw
+# → Output: hive/a1b2c3d4e5f6.psyt  (random filename, no leak)
+
+# Cure it back
+python parasyte.py cure --host hive/
+# → Output: hive/cured/secret.pdf  (filename restored from encrypted payload)
+```
+
 ---
 
 ## Usage
@@ -191,13 +206,14 @@ python parasyte.py cure --host hive/example.png
 ### Infect (Encrypt)
 
 ```bash
-python parasyte.py infect --dna <file_or_folder> [--sel <sel_path>] [--hive <output_path>] [--shred]
+python parasyte.py infect --dna <file_or_folder> [--sel <sel_path>] [--hive <output_path>] [--raw] [--shred]
 ```
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
 | `--dna` | ✅ | — | DNA Payload (file or folder to hide). If folder, all files inside are infected recursively. |
-| `--sel` | ❌ | `sel/` | Path to sel files. A random sel is assigned to each DNA file. |
+| `--sel` | ❌* | `sel/` | Path to disguise media files. A random sel is assigned to each DNA file. *(Not needed when `--raw` is used.) |
+| `--raw` | ❌ | `False` | Encrypt to raw `.psyt` binary (no media disguise). Output filename is a random hex string. |
 | `--hive` | ❌ | `hive/` | Output folder for infected polyglot files. |
 | `--shred` | ❌ | `False` | Securely destroy the original DNA file with random bytes after successful infection. |
 
@@ -214,7 +230,7 @@ python parasyte.py cure --host <file_or_folder> [--hive <output_path>]
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--host` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files inside are cured recursively. |
+| `--host` | ✅ | — | Infected polyglot file or folder to cure. If folder, all media files and `.psyt` files inside are cured recursively. |
 | `--hive` | ❌ | `<host>/cured/` | Output folder for cured files. Files are restored with their original DNA filenames. |
 
 ---
@@ -281,6 +297,37 @@ Done: 5/5 file(s) infected successfully
 Output directory: /Volumes/USB/hive/
 To cure: python parasyte.py cure --host /Volumes/USB/hive/
 ```
+
+### Raw Infect (no disguise media)
+
+```bash
+python parasyte.py infect --dna ./confidential.zip --raw
+```
+
+Output:
+```text
+  Infection Plan
+
+  DNA Payload   1 file(s) from './confidential.zip'
+  Mode          Raw Binary (.psyt)
+  Hive Output   hive
+  Encryption    AES-256-GCM (PBKDF2 600,000 iterations)
+
+Enter password:
+Confirm password:
+
+Infecting...
+[ SUCCESS ] confidential.zip -> a1b2c3d4e5f6.psyt (500,000 -> 500,064 bytes)
+Processing... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+
+Done: 1/1 file(s) infected successfully
+Output directory: /path/to/hive
+To cure: python parasyte.py cure --host hive
+```
+
+The output `.psyt` file is a standalone encrypted binary with no media wrapper. The original filename is preserved inside the encrypted payload and restored upon decryption. The output filename is a random hex string — no information leakage.
+
+Cure works the same way — `cure --host folder/` auto-detects both media files and `.psyt` files.
 
 ### Zip & Unzip Automatically (Chromosome & Helicase)
 
@@ -402,9 +449,10 @@ Most social media platforms **re-encode** uploaded images and videos. This proce
 
 ### File Size
 
-The output file size = sel size + encrypted data size + small overhead (~50 bytes).
-
+**Polyglot mode:** Output file size = sel size + encrypted data size + small overhead (~50 bytes).
 If your secret file is much larger than the sel, the output file will be noticeably larger. For example, a 200 KB JPEG sel containing a 500 MB video will produce a ~500 MB "image" — which may look suspicious.
+
+**Raw mode (`--raw`):** Output file size = original data + ~50 bytes overhead. No size inflation from disguise files.
 
 ### Memory Usage
 
@@ -412,9 +460,10 @@ The current implementation loads entire files into memory. For very large files 
 
 ---
 
-## Running Tests
+## Running Tests & Lint
 
 ```bash
+make lint                          # autoflake + isort + black
 source .venv/bin/activate
 python test_verify.py
 ```
